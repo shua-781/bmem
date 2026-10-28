@@ -5,7 +5,8 @@
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 
-process.env.MEMORY_DIR = process.env.MEMORY_DIR || join(process.cwd(), '.selftest-data')
+// ★ 强制用独立的临时目录：绝不许因为外部设了 MEMORY_DIR 就跑到用户的真实库里去
+process.env.MEMORY_DIR = join(process.cwd(), '.selftest-data-' + process.pid)
 rmSync(process.env.MEMORY_DIR, { recursive: true, force: true })
 
 const store = await import('./store.js')
@@ -92,4 +93,4 @@ chk('注入里不出现身份证/密码原文', !leaked, leaked ? '泄漏了！'
 console.log('\n════════════════════════════════')
 console.log(`通过 ${ok.length} 条，失败 ${bad.length} 条`)
 if (bad.length) { console.log('失败项：'); bad.forEach((b) => console.log('  - ' + b)); process.exitCode = 1 }
-else console.log('全过 ✅  数据目录：' + process.env.MEMORY_DIR)
+else { console.log('全过 ✅  测试数据在 ' + process.env.MEMORY_DIR + '（可删）') }
