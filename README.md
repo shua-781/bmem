@@ -10,7 +10,7 @@
 > | 想先看它能不能跑 | `node src/selftest.mjs` —— 不起服务、不连模型，11 条断言全本地跑 |
 > | 想自己实现一套 | 看 [`QUICKSTART.md`](./QUICKSTART.md)（施工单）或 [`QUICKSTART-纯文本.txt`](./QUICKSTART-纯文本.txt)（纯文本版，能直接贴进对话框） |
 >
-> 零依赖，Node 18+ 即可。数据默认落在 `~/.block-memory/`，**不会碰你的代码仓库**。
+> 零依赖，Node 18+ 即可。数据默认落在 `~/.bmem/`，**不会碰你的代码仓库**。
 
 ---
 

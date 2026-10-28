@@ -1,12 +1,11 @@
 {
-  "name": "block-memory",
+  "name": "bmem",
   "version": "0.1.0",
   "description": "Long-term memory for AI agents: append-only event log + block library + graded retrieval. Not RAG, not summarization.",
   "license": "MIT",
   "type": "module",
   "main": "./src/read.js",
   "bin": {
-    "block-memory": "./src/cli.mjs",
     "bmem": "./src/cli.mjs"
   },
   "exports": {
@@ -35,7 +34,6 @@
     "llm",
     "agent",
     "long-term-memory",
-    "rag-alternative",
     "dsh",
     "mcp"
   ],
@@ -44,7 +42,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/block-memory.git"
+    "url": "https://github.com/OWNER/bmem.git"
   },
   "author": "彼方业火狐",
   "private": false

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// block-memory CLI —— 没有宿主适配器时，靠这个也能用起来
+// bmem CLI —— 没有宿主适配器时，靠这个也能用起来
 //
 //   node cli.mjs remember "用户说他讨厌香菜" [--about 用户]
 //   node cli.mjs search "香菜" [--json]
@@ -8,13 +8,13 @@
 //   node cli.mjs export-md [路径]        生成 MEMORY.md（给纯文件方案）
 //   node cli.mjs init                    建目录 + 灌词表 + 空库自检
 //
-// 数据目录：环境变量 MEMORY_DIR，默认 ~/.block-memory
+// 数据目录：环境变量 MEMORY_DIR，默认 ~/.bmem
 
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-process.env.MEMORY_DIR = process.env.MEMORY_DIR || join(homedir(), '.block-memory')
+process.env.MEMORY_DIR = process.env.MEMORY_DIR || join(homedir(), '.bmem')
 
 const store = await import('./store.js')
 const write = await import('./write.js')
@@ -30,7 +30,7 @@ const flag = (name) => {
 const positional = rest.filter((x, i) => !x.startsWith('--') && rest[i - 1] !== '--about')
 
 function help() {
-  console.log(`block-memory —— 给 AI 用的长期记忆（块库）
+  console.log(`bmem —— 给 AI 用的长期记忆（块库）
 
   remember <文本> [--about 名字]   记一件事（建块）
   search <查询> [--json]           检索：看它会捞到什么、出口是哪种
@@ -125,7 +125,7 @@ if (cmd === 'export-md') {
   const out = positional[0] || join(process.env.MEMORY_DIR, 'MEMORY.md')
   const db = store.loadBlocks()
   const all = Object.values(db.blocks || {})
-  const lines = ['# 我记住的事', '', `> 由 block-memory 生成 · ${new Date().toISOString()} · 共 ${all.length} 块`, '',
+  const lines = ['# 我记住的事', '', `> 由 bmem 生成 · ${new Date().toISOString()} · 共 ${all.length} 块`, '',
     '下面是按时间倒序的记忆。回答涉及具体细节（日期/金额/约定/喜好）时以这里为准；', '这里没有的，就说"我不记得"，不要编。', '']
   all.sort((a, b) => String(b.origin_at || b.created_at).localeCompare(String(a.origin_at || a.created_at)))
   for (const b of all.slice(0, 500)) {
