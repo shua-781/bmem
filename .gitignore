@@ -1,0 +1,11 @@
+# 数据（含用户隐私，绝不提交）
+data/
+.selftest-data/
+.cli-test/
+MEMORY.md
+*.log
+
+# 依赖 / 系统
+node_modules/
+.DS_Store
+Thumbs.db
