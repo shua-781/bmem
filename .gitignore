@@ -1,6 +1,6 @@
 # 数据（含用户隐私，绝不提交）
 data/
-.selftest-data/
+.selftest-data*
 .cli-test/
 MEMORY.md
 *.log
