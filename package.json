@@ -21,7 +21,8 @@
     "QUICKSTART.md",
     "QUICKSTART-纯文本.txt",
     "INSTALL-BY-AI.txt",
-    "LICENSE"
+    "LICENSE",
+    "DISCLAIMER.md"
   ],
   "scripts": {
     "test": "node src/selftest.mjs",
