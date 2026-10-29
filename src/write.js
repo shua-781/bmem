@@ -6,6 +6,7 @@ import {
   loadBlocks, saveBlocks, loadSlots, saveSlots, appendEvent, toISO,
   nextCoord, loadIdx, saveIdx, loadMeta, saveMeta, rebuildIndexes,
 } from './store.js'
+import { segmentWithAI } from './ai.mjs'
 
 // 种子词表（初版：2026-10-27 全天语料的新词发现 + 概念词典，已去掉功能字开头的垃圾词）
 export const SEED_VOCAB = ["记忆", "人格", "日记", "架构", "框架", "协议", "封号", "插件", "消息", "群聊", "群友", "表情包", "动画表情", "奶茶", "波波", "芋泥", "黑糖", "沪上阿姨", "霸王茶姬", "蜜雪冰城", "外卖", "美团", "下单", "订单", "骑手", "照片", "拍照", "相册", "象棋", "下棋", "姐姐", "端口", "显卡", "主板", "供电", "电源", "配置", "nas", "课程", "上课", "作业", "实验", "考试", "睡眠", "晚安", "熬夜", "几点", "早睡", "地址", "收货地址", "支付", "免密支付", "确认支付", "分析化学", "电工电子", "呼和浩特", "湖北荆门", "主人", "白米饭", "火锅", "唱歌", "翻唱", "语音", "空间", "说说", "动态", "贴纸", "表情", "波波奶茶", "黑糖波波", "芋泥波波", "珍珠奶茶", "铃音粉狐", "热饮专区", "兵七进一", "支付确认", "马二进三", "告诉主人", "主人私聊", "兵三进一", "购物车里", "要不要我", "今天中午", "支付方式", "美团支付", "回复主人", "浏览器里", "可以直接", "零下五度", "小额免密", "操作能力", "走车八进", "规格弹窗", "地址列表", "现在需要", "或者直接", "表情表情"]
@@ -115,26 +116,38 @@ function bumpIdx(db, coord) {
   saveIdx('feat', feat); saveIdx('gate', gate); saveIdx('topic', topic); saveIdx('chain', chain)
 }
 
-/** 建块（幂等：同 source_id 已存在则跳过） */
-export function addBlock({ content, features, aboutName = '', source = 'manual', source_id = '', at = Date.now(), topic: topicIn = '' }) {
+/** 建块（幂等：同 source_id + 同内容跳过；内容变了就走自己的坑重建，别卡死） */
+export function addBlock({ content, features, aboutName = '', source = 'manual', source_id = '', at = Date.now(), topic: topicIn = '', noTopic = false }) {
   const text = String(content || '').trim()
   if (text.length < 4) return { ok: false, why: '太短' }
 
   const meta = loadMeta()
   const synced = meta.synced || {}
-  if (source_id && synced[source_id]) return { ok: false, why: '已存在（幂等）', coord: synced[source_id] }
+  const hash = hashOf(text)
+  if (source_id && synced[source_id]) {
+    const prev = loadBlocks().blocks[synced[source_id]]
+    // ★ 2026-10-29 修：老逻辑只看 synced 有没有这个 source_id 就跳过 —— 记忆条目被整理（id 不变、内容变了）
+    //   之后永远进不了库，实测 "22 小时零新增"。现在内容变了就放行，让它走自己的坑重建。
+    if (prev && prev.content_hash === hash) return { ok: false, why: '已存在（内容没变）', coord: synced[source_id] }
+    delete synced[source_id]
+    meta.synced = synced
+    saveMeta(meta)
+    noTopic = true
+  }
 
   const vocab = loadVocab()
   const feats = (features && features.length ? features : featsFromText(text, vocab))
-  const topic = String(topicIn || '').trim() || topicOf(text, aboutName)
+  // ★ 2026-10-29 修：topic 优先用 source_id 派生的稳定键。
+  //   老的 topicOf 会拼出「主人|能力|_」这种垃圾键，不同的事撞同一个 topic 就互相覆盖（实测一个坑被覆盖 15 次）。
+  const topic = String(topicIn || '').trim() || (source_id ? 'src:' + source_id : '') || topicOf(text, aboutName) || ''
   const gate = gateOf(feats)
   const db = loadBlocks()
   const slots = loadSlots()
   const iso = toISO(at)
 
-  // 找同 topic 的 head（一个坑只住一件事）
+  // 找同 topic 的 head（一个坑只住一件事）。noTopic = 永远开新坑，绝不覆盖
   let target = null
-  if (topic) {
+  if (!noTopic && topic) {
     const tIdx = loadIdx('topic', {})
     for (const c of (tIdx[topic] || [])) {
       const b = db.blocks[c]
@@ -194,7 +207,7 @@ export function addBlock({ content, features, aboutName = '', source = 'manual',
     // 全新的事
     kind = 'WRITE'
     coord = nextCoord(slots)
-    const tpc = topic || ('主人|事实|' + text.slice(0, 10))
+    const tpc = topic || ((aboutName || '未分类') + '|事实|' + text.slice(0, 10))
     db.blocks[coord] = {
       coord, ver: 1, content: text, features: feats, topic: tpc,
       gate_main: gate, gate_sub: [], result: 'ok', mood: '', confidence: 'mid',
@@ -212,26 +225,63 @@ export function addBlock({ content, features, aboutName = '', source = 'manual',
   return { ok: true, coord, kind }
 }
 
-/** 把老 memory 的 items 搬成块（幂等；"全部换"里"不丢老记忆"那一步） */
-export function ingestMemoryItems(items = []) {
+/**
+ * ★ 首选入口：交给 AI 切块（2026-10-29）
+ * 一段话（一次聊天、一条长记忆）→ 模型切成"一条一件事"，每块自带标题、特征、归属、类型。
+ * 每块都走 noTopic：一件事一个坑，永远不会把别人的内容挤掉。
+ * llm 不给/模型挂了 → 自动退到正则切句（不报错，只是粗一点）。
+ */
+export async function addBlocksFromText(text, { llm, aboutName = '', source = 'ai', sourceId = '', at = Date.now(), vocab, limit = 12 } = {}) {
+  const v = vocab || loadVocab()
+  const pieces = await segmentWithAI(text, { llm, aboutName, vocab: v, limit })
+  const results = []
+  if (pieces && pieces.length) {
+    pieces.forEach((p, i) => {
+      const r = addBlock({
+        content: p.text,
+        features: p.features && p.features.length ? p.features : featsFromText(p.text, v),
+        topic: p.title ? 'topic:' + p.title : '',
+        aboutName: p.who || aboutName,
+        source,
+        source_id: sourceId ? `${sourceId}#${i}` : '',
+        at,
+        noTopic: true,
+      })
+      results.push({ ...r, title: p.title, kind: p.kind, via: 'ai' })
+    })
+    return { via: 'ai', pieces: pieces.length, results }
+  }
+  // 降级：正则切句
+  const fallback = splitSentences(text)
+  fallback.forEach((piece, i) => {
+    const r = addBlock({
+      content: piece,
+      features: featsFromText(piece, v),
+      aboutName,
+      source,
+      source_id: sourceId ? `${sourceId}#${i}` : '',
+      at,
+      noTopic: true,
+    })
+    results.push({ ...r, via: 'regex' })
+  })
+  return { via: 'regex', pieces: fallback.length, results }
+}
+
+/** 把老 memory 的 items 搬成块（幂等；传 llm 就让 AI 切分，不传就按句子切） */
+export async function ingestMemoryItems(items = [], { llm } = {}) {
   let added = 0
   let skipped = 0
-  const vocab = loadVocab()
   for (const it of items) {
     if (!it || !it.text) continue
-    const pieces = splitSentences(it.text)
-    pieces.forEach((piece, k) => {
-      const r = addBlock({
-        content: piece,
-        features: featsFromText(piece, vocab),
-        aboutName: it.aboutName || '',
-        source: 'memory',
-        source_id: 'mem:' + it.id + (pieces.length > 1 ? '#' + k : ''),
-        at: Number(it.at) || Date.now(),
-      })
-      if (r.ok) added += 1
-      else skipped += 1
+    const r = await addBlocksFromText(it.text, {
+      llm,
+      aboutName: it.aboutName || '',
+      source: 'memory',
+      sourceId: 'mem:' + it.id,
+      at: Number(it.at) || Date.now(),
     })
+    for (const x of r.results) { if (x.ok) added += 1; else skipped += 1 }
   }
   return { added, skipped }
 }

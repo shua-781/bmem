@@ -90,7 +90,47 @@ const priv = read.contextFor('我的身份证号和密码是怎么写的', { top
 const leaked = /110101199001011234|abc12345/.test(priv.text || '')
 chk('注入里不出现身份证/密码原文', !leaked, leaked ? '泄漏了！' : '已过滤')
 
+console.log('\n【7】AI 分块（mock 模型，不外连）')
+const ai = await import('./ai.mjs')
+const mockLlm = async (prompt) => {
+  if (prompt.includes('检索用的概念词')) return '```json\n["奶茶","显卡","记忆系统","香菜","奶茶"]\n```'
+  if (prompt.includes('是不是同一件事')) return '{"same":false,"why":"不同的事"}'
+  if (prompt.includes('切成')) {
+    return '```json\n[' +
+      '{"text":"用户点了沪上阿姨的热芋泥波波奶茶，19 块，送到公寓 3 号楼。","title":"点奶茶","features":["奶茶"],"who":"用户","kind":"事实"},' +
+      '{"text":"用户讨厌香菜，闻到就想吐。","title":"讨厌香菜","features":["香菜"],"who":"用户","kind":"偏好"}' +
+      ']\n```'
+  }
+  return '[]'
+}
+const before7 = Object.keys(store.loadBlocks().blocks).length
+const r7 = await write.addBlocksFromText('一整段混着好几件事的话，交给模型切。', { llm: mockLlm, aboutName: '用户', sourceId: 'ai-test' })
+chk('模型切成 2 块', r7.via === 'ai' && r7.pieces === 2, JSON.stringify({ via: r7.via, pieces: r7.pieces }))
+chk('两块各占自己的坑（noTopic）', r7.results.every((x) => x.ok) && new Set(r7.results.map((x) => x.coord)).size === 2, r7.results.map((x) => x.coord).join(','))
+chk('块数增加了', Object.keys(store.loadBlocks().blocks).length === before7 + 2)
+
+const n7 = Object.keys(store.loadBlocks().blocks).length
+await write.addBlocksFromText('一整段混着好几件事的话，交给模型切。', { llm: mockLlm, aboutName: '用户', sourceId: 'ai-test' })
+chk('同素材重跑不重复建块', Object.keys(store.loadBlocks().blocks).length === n7)
+
+// ★ 这一条是 2026-10-29 实测踩到的坑：记忆条目被整理（id 不变、内容变了）后，老逻辑永远跳过、再也进不了库
+await write.addBlocksFromText('改过的话：用户点了蜜雪冰城的柠檬水。', {
+  llm: async () => '[{"text":"用户点了蜜雪冰城的柠檬水。","title":"点柠檬水","features":["奶茶"],"who":"用户","kind":"事实"}]',
+  aboutName: '用户', sourceId: 'ai-test',
+})
+chk('内容变了能进库（旧逻辑会卡死）', Object.keys(store.loadBlocks().blocks).length > n7, '块数 ' + n7 + ' → ' + Object.keys(store.loadBlocks().blocks).length)
+
+const v7 = await ai.discoverVocabWithAI('语料', { llm: mockLlm, existing: ['奶茶'] })
+chk('AI 提词：去重、去单字', Array.isArray(v7) && !v7.includes('奶茶') && v7.every((w) => w.length >= 2), JSON.stringify(v7))
+
+const pv = ai.pruneVocab(['奶茶', '的', '香菜'], Object.values(store.loadBlocks().blocks), { dfMax: 0.9 })
+chk('体检能剔掉单字词', pv.drop.includes('的'), JSON.stringify(pv))
+
+const noLlm = await write.addBlocksFromText('没有模型的时候也要能落块。这是第二句。', { aboutName: '用户', sourceId: 'ai-fallback' })
+chk('没有 llm 时自动退到正则', noLlm.via === 'regex' && noLlm.pieces >= 1, noLlm.via + ' / ' + noLlm.pieces)
+
 console.log('\n════════════════════════════════')
+
 console.log(`通过 ${ok.length} 条，失败 ${bad.length} 条`)
 if (bad.length) { console.log('失败项：'); bad.forEach((b) => console.log('  - ' + b)); process.exitCode = 1 }
 else { console.log('全过 ✅  测试数据在 ' + process.env.MEMORY_DIR + '（可删）') }

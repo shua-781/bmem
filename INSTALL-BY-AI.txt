@@ -1,5 +1,5 @@
 ════════════════════════════════════════════════════════
-  bmem · 安装向导（这份文件是给 AI 读的）
+  beme · 安装向导（这份文件是给 AI 读的）
 ════════════════════════════════════════════════════════
 
 你是 AI，有文件读写和命令执行权限。
@@ -52,7 +52,7 @@
 格式像这样：
 
   "这台机器有：Node v22 / DSH（profile: web）/ 没有 Claude Code / crontab 可用。
-   我打算按【DSH 插件】方式装，数据放 ~/.bmem/。对吗？"
+   我打算按【DSH 插件】方式装，数据放 ~/.beme/。对吗？"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 第 2 步：把核心代码放到位（这步不做，后面全空）
@@ -61,25 +61,42 @@
 包里 src/ 是**能跑的真代码**，不是示例：
 
   store.js          存储层（事件日志 / 库 / 台账 / 索引重建）
-  write.js          写层（建块 / 覆盖 / 重建 / 幂等 / 按句切分）
+  ai.mjs            AI 切块层（分块 / 起标题 / 抽特征 / 发现新词；不给模型就自动降级）
+  write.js          写层（建块 / 覆盖 / 重建 / 幂等 / 分块入口）
   read.js           读层（打分 / 可用性过滤 / 泛词过滤 / 并列 / 四态出口）
-  cli.mjs           命令行（remember / search / stats / rebuild / export-md）
+  cli.mjs           命令行（remember [--chunk --llm "命令"] / search / stats / rebuild / export-md）
   index.example.js  挂载示例（接你自己的宿主时照这个写）
   selftest.mjs      自检（11 条断言，不起服务不连模型）
 
 ① 复制到一个长期位置（别留在下载目录 / 临时目录）
 
-     mkdir -p ~/.bmem/lib
-     cp <包目录>/src/*.js <包目录>/src/*.mjs <包目录>/src/package.json ~/.bmem/lib/
+     mkdir -p ~/.beme/lib
+     cp <包目录>/src/*.js <包目录>/src/*.mjs <包目录>/src/package.json ~/.beme/lib/
 
 ② 立刻验证 —— 这一步不过，别往下走
 
-     cd ~/.bmem/lib && node selftest.mjs
+     cd ~/.beme/lib && node selftest.mjs
      # 必须看到：通过 11 条，失败 0 条；退出码 0
+
+  ⚠ DSH Desktop 用户特别注意（2026-10-29 实测，连踩三次、进过两次安全模式）：
+
+     把包塞进 profile 的 node_modules 只是"装了一半"。DSH Desktop 还会检查三件事：
+
+       ① cordis.patch.yml 里 insert 的 name，必须能在 node_modules/<name> 找到**目录** ——
+          所以写包名（beme），别写子路径（beme/dsh），否则被判 "not installed" 并静默跳过。
+       ② 包根的 main / exports["."] 要指向**插件入口**（dsh/index.mjs），不是库的 read.js。
+          库改成用子路径访问：beme/read、beme/write、beme/store。
+       ③ 必须挂进 profile 的 package.json 的 dsh.profile.bundles 列表。
+          （DSH 通常会自动加，但被它判过一次"解析失败"就会移掉，得手动加回去。）
+
+     症状：插件市场里能看到它，但启动日志只有一句
+       profile inconsistency: the patch layer inserts beme, which is not installed
+     然后静默跳过 —— 看起来像"成功启动"，其实插件根本没加载。
+     required: false 只能保证它不拖垮宿主，不能保证它加载。
 
 ③ 跑一次冒烟（证明 CLI 能用）
 
-     export MEMORY_DIR=~/.bmem
+     export MEMORY_DIR=~/.beme
      node cli.mjs init
      node cli.mjs remember "用户说他讨厌香菜"
      node cli.mjs search "香菜"        # 应该能捞到刚才那条
@@ -124,7 +141,7 @@
 第 4 步：定数据位置（绝不许放进项目仓库）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  默认：~/.bmem/
+  默认：~/.beme/
   覆盖：环境变量 MEMORY_DIR
   结构：
     events.jsonl   只追加的事件日志（唯一真相源，永不删）
@@ -164,7 +181,7 @@
 **绝对不要"每轮建块"**。一天几百块，碎到没法用。
 
 如果是 C/D 方案（没有插件钩子），触发只能用外部定时：
-  crontab -e 加一行：0 3 * * * MEMORY_DIR=~/.bmem node <包路径>/cli.mjs sync
+  crontab -e 加一行：0 3 * * * MEMORY_DIR=~/.beme node <包路径>/cli.mjs sync
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 第 7 步：实测验证（不许跳过）
@@ -215,7 +232,7 @@
   1. **不确定就问**。探测结果拿不准，问用户，别猜着装。
   2. **不许改设计**。觉得哪条不合理，停下来问，别自己动手改。
      这套设计里每个"看起来能省"的步骤，背后都是一次具体事故。
-  3. **不许把数据写进用户的代码仓库**。默认 ~/.bmem/。
+  3. **不许把数据写进用户的代码仓库**。默认 ~/.beme/。
   4. **不许跳过验证**。"装好了"这三个字要拿命令输出换。
   5. **装不上就说装不上**，并告诉我卡在哪一条 —— 那比一个假装成功的结果有用得多。
 

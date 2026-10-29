@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bmem CLI —— 没有宿主适配器时，靠这个也能用起来
+// beme CLI —— 没有宿主适配器时，靠这个也能用起来
 //
 //   node cli.mjs remember "用户说他讨厌香菜" [--about 用户]
 //   node cli.mjs search "香菜" [--json]
@@ -8,13 +8,13 @@
 //   node cli.mjs export-md [路径]        生成 MEMORY.md（给纯文件方案）
 //   node cli.mjs init                    建目录 + 灌词表 + 空库自检
 //
-// 数据目录：环境变量 MEMORY_DIR，默认 ~/.bmem
+// 数据目录：环境变量 MEMORY_DIR，默认 ~/.beme
 
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-process.env.MEMORY_DIR = process.env.MEMORY_DIR || join(homedir(), '.bmem')
+process.env.MEMORY_DIR = process.env.MEMORY_DIR || join(homedir(), '.beme')
 
 const store = await import('./store.js')
 const write = await import('./write.js')
@@ -30,9 +30,12 @@ const flag = (name) => {
 const positional = rest.filter((x, i) => !x.startsWith('--') && rest[i - 1] !== '--about')
 
 function help() {
-  console.log(`bmem —— 给 AI 用的长期记忆（块库）
+  console.log(`beme —— 给 AI 用的长期记忆（块库）
 
-  remember <文本> [--about 名字]   记一件事（建块）
+  remember <文本> [--about 名字] [--chunk --llm "命令"]
+                                   记一件事；带 --chunk 就让模型切成"一件事一块"
+                                   --llm 给一条 shell 命令：prompt 进 stdin，答案出 stdout
+                                   例：--chunk --llm "ollama run qwen2.5" 
   search <查询> [--json]           检索：看它会捞到什么、出口是哪种
   stats                            块数 / 词表 / 索引 / 事件数
   rebuild                          重建 8 张索引（库坏了先跑这个）
@@ -78,16 +81,25 @@ if (cmd === 'init') {
 }
 
 if (cmd === 'remember') {
-  const text = positional.join(' ').trim()
-  if (!text) { console.error('用法：remember <文本> [--about 名字]'); process.exit(2) }
-  const r = write.addBlock({
-    content: text,
-    aboutName: flag('about') || '',
-    source: 'cli',
-    topic: flag('topic') || '',
-  })
-  console.log(r.ok ? `✓ ${r.coord}  ${r.kind}` : `· 跳过：${r.why}`)
-  process.exit(r.ok ? 0 : 0)
+  const text = positional[0]
+  if (!text) { console.log('要说记什么：beme remember "内容"'); process.exit(1) }
+  const about = flag('about')
+  const llmCmd = flag('llm')
+  const wantChunk = argv.includes('--chunk') || Boolean(llmCmd)
+  if (!wantChunk) {
+    const r = write.addBlock({ content: text, aboutName: about || '', source: 'cli', noTopic: true })
+    console.log(r.ok ? '✓ 建块 ' + r.coord + '（' + r.kind + '）' : '跳过：' + r.why)
+    if (r.ok) store.rebuildIndexes(store.loadBlocks())
+    process.exit(r.ok ? 0 : 1)
+  }
+  // ★ AI 切块：--llm 给的是"一条命令"，prompt 进 stdin、答案出 stdout（任何模型/任何 CLI 都能接）
+  const { execFileSync } = await import('node:child_process')
+  const llm = async (prompt) => execFileSync('bash', ['-lc', llmCmd], { input: prompt, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 })
+  const r = await write.addBlocksFromText(text, { llm, aboutName: about || '', source: 'cli', sourceId: 'cli:' + Date.now() })
+  console.log('✓ ' + r.via + ' 切出 ' + r.pieces + ' 块')
+  for (const x of r.results) console.log('  ' + (x.ok ? '+ ' + x.coord : '跳过 ' + x.why) + (x.title ? '  「' + x.title + '」' : ''))
+  store.rebuildIndexes(store.loadBlocks())
+  process.exit(0)
 }
 
 if (cmd === 'search') {
@@ -125,7 +137,7 @@ if (cmd === 'export-md') {
   const out = positional[0] || join(process.env.MEMORY_DIR, 'MEMORY.md')
   const db = store.loadBlocks()
   const all = Object.values(db.blocks || {})
-  const lines = ['# 我记住的事', '', `> 由 bmem 生成 · ${new Date().toISOString()} · 共 ${all.length} 块`, '',
+  const lines = ['# 我记住的事', '', `> 由 beme 生成 · ${new Date().toISOString()} · 共 ${all.length} 块`, '',
     '下面是按时间倒序的记忆。回答涉及具体细节（日期/金额/约定/喜好）时以这里为准；', '这里没有的，就说"我不记得"，不要编。', '']
   all.sort((a, b) => String(b.origin_at || b.created_at).localeCompare(String(a.origin_at || a.created_at)))
   for (const b of all.slice(0, 500)) {

@@ -1,0 +1,11 @@
+# Bundle patch for beme（第一代）
+#
+# 装：dsh plugin add <这个包>，这一行会被插进 profile 的插件表。
+# 手写 insert 会在 profile 的 patch 层被改写时丢掉，所以必须随包发。
+- insert:
+    - id: beme
+      name: 'beme'
+      config:
+        topN: 8
+        budget: 1800
+        hint: true

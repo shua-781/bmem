@@ -1,19 +1,21 @@
 {
-  "name": "bmem",
-  "version": "0.1.0",
-  "description": "Long-term memory for AI agents: append-only event log + block library + graded retrieval. Not RAG, not summarization.",
+  "name": "beme",
+  "version": "0.1.2",
+  "description": "Long-term memory for AI agents: append-only event log + block library + AI-segmented chunks + graded retrieval. Not RAG, not summarization.",
   "license": "MIT",
   "type": "module",
-  "main": "./src/read.js",
+  "main": "./dsh/index.mjs",
   "bin": {
-    "bmem": "./src/cli.mjs"
+    "beme": "./src/cli.mjs"
   },
   "exports": {
-    ".": "./src/read.js",
+    ".": "./dsh/index.mjs",
     "./store": "./src/store.js",
     "./write": "./src/write.js",
     "./read": "./src/read.js",
-    "./cli": "./src/cli.mjs"
+    "./cli": "./src/cli.mjs",
+    "./dsh": "./dsh/index.mjs",
+    "./plugin": "./dsh/index.mjs"
   },
   "files": [
     "src/",
@@ -22,7 +24,8 @@
     "QUICKSTART-纯文本.txt",
     "INSTALL-BY-AI.txt",
     "LICENSE",
-    "DISCLAIMER.md"
+    "DISCLAIMER.md",
+    "dsh"
   ],
   "scripts": {
     "test": "node src/selftest.mjs",
@@ -36,15 +39,26 @@
     "agent",
     "long-term-memory",
     "dsh",
-    "mcp"
+    "mcp",
+    "chunking",
+    "ai-memory"
   ],
   "engines": {
     "node": ">=18"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/bmem.git"
+    "url": "https://github.com/shua-781/beme.git"
   },
   "author": "彼方业火狐",
-  "private": false
+  "private": false,
+  "dsh": {
+    "bundle": {
+      "patch": "./dsh/cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  }
 }

@@ -2,7 +2,7 @@
 
 **Disclaimer, Privacy Notice & Limitation of Liability**
 
-> 最后更新：2026-10-28 · 适用于本仓库（`bmem`）的全部代码、文档与示例。
+> 最后更新：2026-10-28 · 适用于本仓库（`beme`）的全部代码、文档与示例。
 >
 > **请在使用前完整阅读。你下载、安装、运行、修改或以任何方式使用本软件，即视为
 > 已阅读、理解并不可撤销地接受本文件的全部条款。如果你不同意其中任何一条，
@@ -89,7 +89,7 @@
 ### 1.5 你必须自己做的三件事
 
 ```
-① 备份      —— 定期把 ~/.bmem/ 拷走，至少留一份离线副本
+① 备份      —— 定期把 ~/.beme/ 拷走，至少留一份离线副本
 ② 上锁      —— 确认目录权限；共享电脑/笔记本请开全盘加密
 ③ 别当唯一副本 —— 重要的事，在人能读的地方也留一份
 ```
@@ -340,7 +340,7 @@
 ```
 ① 停止使用
 ② 删除本仓库的代码
-③ 删除 ~/.bmem/ 及其下全部数据
+③ 删除 ~/.beme/ 及其下全部数据
 ④ 删除你基于本库生成的任何衍生数据
 ```
 
@@ -357,7 +357,7 @@
 
 # Disclaimer, Privacy Notice & Limitation of Liability (English)
 
-**Last updated: 2026-10-28.** Applies to all code, docs and examples in this repository (`bmem`).
+**Last updated: 2026-10-28.** Applies to all code, docs and examples in this repository (`beme`).
 
 **By downloading, installing, running, modifying or otherwise using this software, you
 acknowledge that you have read, understood and irrevocably accept every term below.
@@ -474,5 +474,5 @@ jurisdiction and does not accept mandatory jurisdiction except where required by
 
 ## If you disagree
 
-Stop using it, delete the code, delete `~/.bmem/` and all data under it, and delete any derivative
+Stop using it, delete the code, delete `~/.beme/` and all data under it, and delete any derivative
 data. Continued use constitutes acceptance.
