@@ -1,6 +1,6 @@
 {
   "name": "beme",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Long-term memory for AI agents: append-only event log + block library + AI-segmented chunks + graded retrieval. Not RAG, not summarization.",
   "license": "MIT",
   "type": "module",
