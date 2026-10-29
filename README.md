@@ -878,8 +878,14 @@ L2  索引         纯派生，可删可重建
 | 她把自己叫成**旧名字** | 记忆里第三人称写的是旧名；没有"我是谁"的锚 | 加一条 L5 身份锚；**但别把"网上那个同名的人"也改掉**——那是别人，改了反而错 |
 | 做成 DSH 插件后，**插件市场能看到、但启动不加载** | ① 宿主拿 `insert` 的 `name` 去 `node_modules/<name>` 找目录——写 `beme/dsh` 就成了"没装"；② 宿主有自己的安装记录（`profiles/.generations`），手动 `pnpm install` 不认 | `name` 写**包名**；包根的 `main`/`exports["."]` **指向插件入口**（库走子路径 `beme/read`、`beme/write`）；把包挂进 profile 的 `dsh.profile.bundles` |
 | 插件加载时报 `Cannot read properties of undefined (reading 'render')` | `defineTool` 的每个工具**必须带** `output: { schema, render }`，缺了宿主读 `undefined.render` 直接崩 | 照官方写法给一个 `jsonOutput` 辅助：`{ schema, render: (_a, v) => [{ type:'text', text: JSON.stringify(v) }] }` |
+| **AI 切块从来没跑过**，而且一个报错都没有 | 插件的 `inject` 里没写 `'llm'` → `ctx.llm` 永远是 `undefined` → `llmFor()` 返回 `null` → 静默降级成正则切句 | `inject` 必须声明 `'llm'`；宿主 LLM 服务的真接口是**流式**的 `ctx.llm.stream({provider, model, messages})`，**没有 `ask()`**；路由取 `agent.options.provider/model`（当前会话的模型） |
+| 装完**插件市场能看到、但工具不出现** | 手动 `pnpm install` 只改 `node_modules`，`dsh.profile.bundles` 没它 → 启动直接跳过 | 用 **`dsh plugin --profile web add <包>`**——它会自己补 `bundles`（实测） |
 
-这八条都是真机踩出来的，不是推演。改完的代码在这份仓库里（`src/ai.mjs` 是新增的）。
+这九条都是真机踩出来的，不是推演。改完的代码在这份仓库里（`src/ai.mjs` 是新增的）。
+
+> **实测验收（2026-10-29 13:33）**：走 `dsh plugin add` 装好后，一句话
+> 「我最喜欢墨绿，不吃香菜，另外周三下午四点有个会」→ 库里出现 **3 块**
+> （周三开会 / 不吃香菜 / 墨绿）。原文是逗号连着的，正则切不开 → **AI 切块确实在跑**。
 
 > **补一条关于"切块"的实测**：用脚本按标题 + 固定字数硬切，会把句子从中间切断，产生
 > 「旧版 10-24 已移入…」这种没有开头的残片。检索时它照样能命中，但你拿到的是半句话。
